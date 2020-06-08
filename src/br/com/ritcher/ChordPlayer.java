@@ -354,36 +354,7 @@ public class ChordPlayer {
 		}
 		return notes.get(t % 12);
 	}
-//
-//	private void play(String[] note, long duracao2) throws InterruptedException {
-//		for (int i = 0; i < note.length; i++) {
-//			channels[instrument].noteOn(id(note[i]) + transpose, volume);
-//		}
-//		Thread.sleep(duracao2);
-//		for (int i = 0; i < note.length; i++) {
-//			channels[instrument].noteOff(id(note[i]) + transpose);
-//		}
-//	}
-//
-//	/**
-//	 * Plays the given note for the given duration
-//	 */
-//	private void play(String note, long duration) throws InterruptedException {
-//		// * start playing a note
-//		channels[instrument].noteOn(id(note) + transpose, volume);
-//		// * wait
-//		Thread.sleep(duration);
-//		// * stop playing a note
-//		channels[instrument].noteOff(id(note) + transpose);
-//	}
-//
-//	/**
-//	 * Plays nothing for the given duration
-//	 */
-//	private void rest(long duracao2) throws InterruptedException {
-//		Thread.sleep(duracao2);
-//	}
-//
+	
 	/**
 	 * Returns the MIDI id for a given note: eg. 4C -> 60
 	 * 
