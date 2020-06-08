@@ -8,6 +8,7 @@ import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 
 import javax.sound.midi.MidiChannel;
@@ -17,6 +18,8 @@ import javax.sound.midi.Synthesizer;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JTextArea;
+
+import br.com.ritcher.ChordPlayer.Player;
 
 public class ChordPlayer {
 	private List<Long> times = new ArrayList<Long>();
@@ -40,6 +43,93 @@ public class ChordPlayer {
 	private JTextArea ta;
 	private int currentPattern;
 
+	Player player;
+	
+	class Player implements Runnable {
+		public boolean paused = false;
+		
+		public void play(String[] c, long duracao) {
+			toPlay.add(c);
+			duracoes.add(duracao);
+			if(!playing) {
+				synchronized(thread) {
+					thread.notifyAll();
+				}
+			}
+		}
+
+		public void play(String c, long duracao) {
+			play(new String[] {c}, duracao);
+		}
+
+		public void stop() {
+			toPlay.clear();
+			duracoes.clear();
+			synchronized (thread) {
+				thread.notifyAll();
+			}
+		}
+		
+		public boolean playing = false;
+		
+		LinkedList<String[]> toPlay = new LinkedList<String[]>();
+		LinkedList<Long> duracoes = new LinkedList<Long>();
+		private Thread thread;
+		
+		@Override
+		public void run() {
+			thread = Thread.currentThread();
+			synchronized (thread) {
+				while(true) {
+					while(paused) {
+						try {
+							thread.wait();
+						} catch (InterruptedException e) {
+						}
+					}
+					
+					while(!toPlay.isEmpty()) {
+						playing = true;
+						String[] note = toPlay.poll();
+						long d = duracoes.poll();
+						
+						for (int i = 0; i < note.length; i++) {
+							channels[instrument].noteOn(id(note[i]) + transpose, volume);
+						}
+						try {
+							thread.wait(d);
+						} catch (InterruptedException e) {
+						}
+						for (int i = 0; i < note.length; i++) {
+							channels[instrument].noteOff(id(note[i]) + transpose);
+						}	
+					}
+					try {
+						playing = false;
+						thread.wait();
+					} catch (InterruptedException e) {
+					}
+				}
+			}
+		}
+
+		private final String[] REST = new String[] {};
+		public void rest(long duracao) {
+			play(REST, duracao);
+		}
+
+		public void unpause() {
+			this.paused = false;
+			synchronized (thread) {
+				thread.notifyAll();
+			}
+		}
+
+		public void pause() {
+			this.paused = true;
+		}
+	}
+	
 	public static void main(String[] args) throws MidiUnavailableException {
 		new ChordPlayer().setup();
 	}
@@ -47,6 +137,11 @@ public class ChordPlayer {
 	private void setup() throws MidiUnavailableException {
 		setupChords();
 		setupPlayPatterns();
+		
+		player = new Player();
+		Thread play = new Thread(player);
+		play.start();
+		
 
 		JFrame frame = new JFrame("Player");
 		frame.setSize(500, 200);
@@ -82,10 +177,15 @@ public class ChordPlayer {
 					return;
 					
 				} else if (e.isControlDown() && e.getKeyCode() == KeyEvent.VK_P) {
-					playContents();
+					if(player.playing) {
+						player.stop();
+					}
+					else {
+						playContents();
+					}
+					
 					e.consume();
 					return;
-					
 				}
 
 				char c = e.getKeyChar();
@@ -145,13 +245,13 @@ public class ChordPlayer {
 	private void setupPlayPatterns() {
 		playPatternList.add(new PlayPattern() {
 			@Override
-			public void playPattern(ChordPlayer s, String[] cc, long duracao) throws InterruptedException {
+			public void playPattern(Player s, String[] cc, long duracao) throws InterruptedException {
 				s.play(cc, duracao);
 			}
 		});
 		playPatternList.add(new PlayPattern() {
 			@Override
-			public void playPattern(ChordPlayer s, String[] cc, long duracao) throws InterruptedException {
+			public void playPattern(Player s, String[] cc, long duracao) throws InterruptedException {
 				s.play(cc, duracao);
 				s.play(cc, duracao);
 				s.play(cc, duracao);
@@ -160,7 +260,7 @@ public class ChordPlayer {
 		});
 		playPatternList.add(new PlayPattern() {
 			@Override
-			public void playPattern(ChordPlayer s, String[] cc, long duracao) throws InterruptedException {
+			public void playPattern(Player s, String[] cc, long duracao) throws InterruptedException {
 				s.play(cc, duracao);
 				s.play(cc, duracao);
 				s.rest(duracao);
@@ -169,33 +269,33 @@ public class ChordPlayer {
 		});
 		playPatternList.add(new PlayPattern() {
 			@Override
-			public void playPattern(ChordPlayer s, String[] cc, long duracao) throws InterruptedException {
-				play(cc, duracao);
-				rest(duracao);
-				play(cc, duracao);
-				rest(duracao);
+			public void playPattern(Player s, String[] cc, long duracao) throws InterruptedException {
+				s.play(cc, duracao);
+				s.rest(duracao);
+				s.play(cc, duracao);
+				s.rest(duracao);
 			}
 		});
 		playPatternList.add(new PlayPattern() {
 			@Override
-			public void playPattern(ChordPlayer s, String[] cc, long duracao) throws InterruptedException {
+			public void playPattern(Player s, String[] cc, long duracao) throws InterruptedException {
 				if (cc.length < 5) {
-					play(cc[0], duracao);
-					play(cc[2], duracao);
-					play(cc[3], duracao);
-					play(cc[2], duracao);
+					s.play(cc[0], duracao);
+					s.play(cc[2], duracao);
+					s.play(cc[3], duracao);
+					s.play(cc[2], duracao);
 				} else {
-					play(cc[0], duracao);
-					play(cc[2], duracao);
-					play(cc[4], duracao);
-					play(cc[2], duracao);
+					s.play(cc[0], duracao);
+					s.play(cc[2], duracao);
+					s.play(cc[4], duracao);
+					s.play(cc[2], duracao);
 				}
 			}
 		});
 	}
 
 	private void playPattern(String[] cc) throws InterruptedException {
-		playPatternList.get(currentPattern).playPattern(this,  cc,  duracao);
+		playPatternList.get(currentPattern).playPattern(this.player,  cc,  duracao);
 	}
 
 	private void updateSetup(char c) {
@@ -221,7 +321,10 @@ public class ChordPlayer {
 		updateStatus();
 	}
 
+	boolean playingContents = false;
+	
 	private void playContents() {
+		player.pause();
 		String text = ta.getText();
 		for (int i = 0; i < text.length(); i++) {
 			String[] cc = chords.get(text.charAt(i));
@@ -235,11 +338,12 @@ public class ChordPlayer {
 				e.printStackTrace();
 			}
 		}
+		player.unpause();
 	}
 
 	private void updateStatus() {
 		status.setText("Setup:" + setupvar + " Trans(n):" + transpose + "(" + getTransposedNote() + ")" + " Volume(v):"
-				+ volume + " Time(t):" + duracao + " Instr(i):" + instrument + " Pattern(l):" + currentPattern
+				+ volume + " Time(m):" + duracao + " Instr(i):" + instrument + " Pattern(l):" + currentPattern
 				+ " Clear: Ctrl+l");
 	}
 
@@ -250,36 +354,36 @@ public class ChordPlayer {
 		}
 		return notes.get(t % 12);
 	}
-
-	private void play(String[] note, long duracao2) throws InterruptedException {
-		for (int i = 0; i < note.length; i++) {
-			channels[instrument].noteOn(id(note[i]) + transpose, volume);
-		}
-		Thread.sleep(duracao2);
-		for (int i = 0; i < note.length; i++) {
-			channels[instrument].noteOff(id(note[i]) + transpose);
-		}
-	}
-
-	/**
-	 * Plays the given note for the given duration
-	 */
-	private void play(String note, long duration) throws InterruptedException {
-		// * start playing a note
-		channels[instrument].noteOn(id(note) + transpose, volume);
-		// * wait
-		Thread.sleep(duration);
-		// * stop playing a note
-		channels[instrument].noteOff(id(note) + transpose);
-	}
-
-	/**
-	 * Plays nothing for the given duration
-	 */
-	private void rest(long duracao2) throws InterruptedException {
-		Thread.sleep(duracao2);
-	}
-
+//
+//	private void play(String[] note, long duracao2) throws InterruptedException {
+//		for (int i = 0; i < note.length; i++) {
+//			channels[instrument].noteOn(id(note[i]) + transpose, volume);
+//		}
+//		Thread.sleep(duracao2);
+//		for (int i = 0; i < note.length; i++) {
+//			channels[instrument].noteOff(id(note[i]) + transpose);
+//		}
+//	}
+//
+//	/**
+//	 * Plays the given note for the given duration
+//	 */
+//	private void play(String note, long duration) throws InterruptedException {
+//		// * start playing a note
+//		channels[instrument].noteOn(id(note) + transpose, volume);
+//		// * wait
+//		Thread.sleep(duration);
+//		// * stop playing a note
+//		channels[instrument].noteOff(id(note) + transpose);
+//	}
+//
+//	/**
+//	 * Plays nothing for the given duration
+//	 */
+//	private void rest(long duracao2) throws InterruptedException {
+//		Thread.sleep(duracao2);
+//	}
+//
 	/**
 	 * Returns the MIDI id for a given note: eg. 4C -> 60
 	 * 
@@ -292,5 +396,5 @@ public class ChordPlayer {
 }
 
 interface PlayPattern {
-	void playPattern(ChordPlayer s, String[] cc, long duracao) throws InterruptedException;
+	void playPattern(Player s, String[] cc, long duracao) throws InterruptedException;
 }
