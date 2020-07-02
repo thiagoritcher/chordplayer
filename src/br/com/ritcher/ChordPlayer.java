@@ -292,6 +292,23 @@ public class ChordPlayer {
 				}
 			}
 		});
+
+		playPatternList.add(new PlayPattern() {
+			@Override
+			public void playPattern(Player s, String[] cc, long duracao) throws InterruptedException {
+				if (cc.length < 5) {
+					s.play(new String[] {cc[0], cc[0]}, duracao);
+					s.play(new String[] {cc[0], cc[2]}, duracao);
+					s.play(new String[] {cc[0], cc[3]}, duracao);
+					s.play(new String[] {cc[0], cc[2]}, duracao);
+				} else {
+					s.play(new String[] {cc[0], cc[0]}, duracao);
+					s.play(new String[] {cc[0], cc[2]}, duracao);
+					s.play(new String[] {cc[0], cc[4]}, duracao);
+					s.play(new String[] {cc[0], cc[2]}, duracao);
+				}
+			}
+		});
 	}
 
 	private void playPattern(String[] cc) throws InterruptedException {
